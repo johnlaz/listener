@@ -1,143 +1,121 @@
-# Listener Pro AI — v3.0 Groq Edition
+<div align="center">
 
-> Real-time AI conversational support. Speak. AI listens. AI responds. Repeat.
+<img src="./app/icon-192x192.png" alt="Listener Pro AI" width="112" height="112">
 
-![Listener Pro](./apple-touch-icon.png)
+# LISTENER PRO
 
-## What It Does
+### Speak. AI listens. AI responds. Repeat.
 
-**Listener Pro** is a progressive web app that gives you a real-time AI co-pilot for conversations — whether you're in a tough talk, a sales call, a coaching session, or just want to think out loud.
+**Your real-time AI co-pilot for the conversations that matter.**
+Live whispered coaching while you talk — or a full AI session on demand.
 
-### Two Modes
+[**⚡ Launch the App**](https://johnlaz.github.io/listener/app/) &nbsp;·&nbsp; [**🌐 Visit the Site**](https://johnlaz.github.io/listener/) &nbsp;·&nbsp; [**🤖 Download the APK**](https://johnlaz.github.io/listener/app/lpai.apk)
 
-**👂 Whisper Mode** — AI listens to a live conversation and whispers coaching cues back to you. Four sub-modes:
-- 💚 **Supportive** — Short validating phrases ("I hear you.", "That makes sense.")
-- 💛 **Engaged** — One curious follow-up question per turn
-- ❤️ **Logical** — Calm objective counter-point
-- 💙 **Baseline** — De-escalation and mediation phrases
+![Powered by Groq](https://img.shields.io/badge/powered%20by-Groq-f55036?style=flat-square)
+![PWA](https://img.shields.io/badge/installable-PWA-00aaff?style=flat-square)
+![No account](https://img.shields.io/badge/account-none-00ff88?style=flat-square)
+![License](https://img.shields.io/badge/license-MIT-lightgrey?style=flat-square)
 
-**🧠 Session Mode** — Direct AI conversation with four personas:
-- 🧠 **Therapist** — CBT-informed reflective listening
-- 💼 **Sales Coach** — Roleplay as a prospect or get coaching feedback
-- 🪞 **Devil's Advocate** — Stress-tests your thinking
-- 🧭 **Life Coach** — Goals, obstacles, action steps
+<img src="./app/screenshot-wide.png" alt="Listener Pro on desktop" width="760">
+
+</div>
 
 ---
 
-## How It Works
+## Some conversations are too important to wing.
 
-```
-Mic → VAD → Groq Whisper STT → Groq LLM (streaming) → Web Speech TTS
-```
+A tense talk with someone you love. A sales call with real money on the line. A coaching session where you need to find the right words *right now*.
 
-- **VAD** (Voice Activity Detection) — detects when you stop speaking and auto-sends
-- **Groq Whisper** — transcribes your speech, typically in ~200–400ms
-- **Groq LLM** — streams a response using your chosen model
-- **Web Speech API** — speaks the response back; VAD is gated while AI speaks so it can't hear itself
-- **⚡ Manual override** — force a reply at any time
+Listener Pro sits quietly in your corner. It hears the conversation, thinks at the speed of Groq, and gives you exactly one thing: the next best thing to say.
+
+No scripts to memorize. No tabs to switch. Just a calm voice in your ear.
 
 ---
 
-## Setup
+## Two ways to use it
 
-### 1. Get a Groq API Key
+### 👂 Whisper Mode — a coach in your ear
+Listener Pro follows a live conversation and whispers cues back to you, in the style you choose:
 
-Free at [console.groq.com](https://console.groq.com). Your key starts with `gsk_`.
-
-### 2. Deploy
-
-**Option A — GitHub Pages (recommended)**
-1. Fork or clone this repo
-2. Go to repo **Settings → Pages → Source → Deploy from branch → main / root**
-3. Visit `https://yourusername.github.io/listener-pro`
-4. Enter your Groq key on first launch — stored locally, never sent anywhere except Groq
-
-**Option B — Local**
-```bash
-# Serve with any static server (required for mic permissions over HTTPS or localhost)
-npx serve .
-# or
-python3 -m http.server 8080
-```
-Then open `http://localhost:8080`
-
-> ⚠️ Microphone access requires HTTPS in production. GitHub Pages provides this automatically.
-
-### 3. Install as PWA
-
-On mobile: tap **Share → Add to Home Screen** (iOS) or the install banner (Android/Chrome).  
-On desktop: click the install icon in the address bar.
-
----
-
-## Models
-
-### LLM (configurable in Settings)
-
-| Model | Tag | Notes |
+| | Style | What you get |
 |---|---|---|
-| `llama-3.3-70b-versatile` | DEFAULT | Best quality, recommended |
-| `llama-3.1-8b-instant` | FASTEST | Ultra-low latency, lighter |
-| `llama3-70b-8192` | BALANCED | Long context (8k tokens) |
-| `mixtral-8x7b-32768` | LARGE CTX | 32k context for long sessions |
+| 💚 | **Supportive** | Short, validating phrases — *"I hear you."* *"That makes sense."* |
+| 💛 | **Engaged** | One curious follow-up question, every turn |
+| ❤️ | **Logical** | A calm, objective counter-point |
+| 💙 | **Baseline** | De-escalation and mediation language when things heat up |
 
-### STT (configurable in Settings)
+### 🧠 Session Mode — think out loud with a partner
+Talk directly to an AI that actually plays a role:
 
-| Model | Notes |
-|---|---|
-| `whisper-large-v3` | Highest accuracy, recommended |
-| `whisper-large-v3-turbo` | ~2x faster, minimal accuracy trade-off |
-
----
-
-## Features
-
-- 🎯 **VAD with silence threshold** — configurable 400ms–2000ms (Settings)
-- 🔊 **TTS voice selector** — any browser voice, with test button
-- 💬 **Streaming responses** — words appear as they generate
-- 📊 **Pipeline timing** — see STT and LLM latency live
-- 📋 **Session history** — auto-saves with AI-generated summaries
-- 🔒 **Lock sessions** — protect important sessions from deletion
-- 📝 **Session notes** — attach personal notes to any session
-- 📤 **Export** — full transcripts and summaries as .txt
-- 💼 **Sales templates** — save prospect profiles with auto-fill from company URL
-- 👁 **Ghost Mode** — blank screen with tap-to-change-mode corners (stealth use)
-- 📦 **Import/Export** — backup and restore all data as JSON
-- 🔌 **Offline-capable** — app shell cached by service worker
+| | Persona | Best for |
+|---|---|---|
+| 🧠 | **Therapist** | CBT-informed reflective listening |
+| 💼 | **Sales Coach** | Roleplay a prospect, or get coached on your pitch |
+| 🪞 | **Devil's Advocate** | Stress-testing ideas before the world does |
+| 🧭 | **Life Coach** | Goals, obstacles, and concrete next steps |
 
 ---
 
-## File Structure
+## Built for speed
 
 ```
-listener-pro/
-├── index.html              # Full app (single file)
-├── manifest.json           # PWA manifest
-├── sw.js                   # Service worker
-├── favicon.ico
-├── apple-touch-icon.png    # iOS home screen icon (180x180)
-├── icon-72x72.png
-├── icon-96x96.png
-├── icon-128x128.png
-├── icon-144x144.png
-├── icon-152x152.png
-├── icon-192x192.png
-├── icon-384x384.png
-├── icon-512x512.png
-└── icon-512x512-maskable.png
+🎙 Mic  →  VAD  →  Groq Whisper  →  Groq LLM (streaming)  →  🔊 Voice
 ```
 
----
-
-## Privacy
-
-- Your Groq API key is stored in `localStorage` — never transmitted anywhere except directly to `api.groq.com`
-- Audio is processed locally by your browser's microphone APIs
-- No analytics, no tracking, no backend
-- All session history is stored in `localStorage` on your device
+Groq's inference is fast enough that the conversation never has to wait. Words stream onto your screen as they're generated, and the AI never hears its own voice — listening pauses automatically while it speaks.
 
 ---
 
-## License
+## Always on the newest models
 
-MIT — use freely, modify freely.
+Groq ships new models constantly. Listener Pro keeps up **without an update**: save your key and the app pulls the latest chat models available to *your* account, drops the non-chat ones, and lets you pick from a dropdown in Settings. The list refreshes itself in the background. If a model is ever retired, the app notices and switches over.
+
+---
+
+## Everything else you'd want
+
+- 🎯 **Tunable voice detection** — dial the silence threshold from 400 ms to 2 s
+- 🔊 **Your choice of voice** — any voice your device offers
+- 📋 **Session history** with AI-written summaries, personal notes, and lock-to-protect
+- 💼 **Sales templates** — build a prospect profile, or auto-fill it from a company URL
+- 👁 **Ghost Mode** — a blank, discreet screen with tap-corner controls
+- 📦 **Backup & restore** everything as a single JSON file
+- 🔌 **Works offline** as an installed app
+
+---
+
+## 🔒 Private by design
+
+- **No account. No cloud. No subscription.** Bring your own free Groq key.
+- Your key and every session live **only on your device**.
+- The only place your data ever goes is straight to Groq.
+- No analytics. No tracking. No backend.
+
+---
+
+## Get started in 60 seconds
+
+1. Grab a free API key at [console.groq.com](https://console.groq.com)
+2. Open **[johnlaz.github.io/listener/app](https://johnlaz.github.io/listener/app/)**
+3. Paste your key. Hit **Initialize**. Start talking.
+
+**Install it:** tap *Share → Add to Home Screen* on iOS, the install banner on Android, or the install icon in your desktop browser's address bar. Prefer a native feel on Android? [Grab the APK](https://johnlaz.github.io/listener/app/lpai.apk).
+
+---
+
+## Repo layout
+
+```
+/            Landing page
+/app/        The app — index.html, manifest.json, sw.js, icons, APK
+```
+
+Technical docs, self-hosting, and the full file list live in [`app/README.md`](./app/README.md).
+
+---
+
+<div align="center">
+
+**Made by [LAZLAB Creations](https://johnlaz.github.io/)** &nbsp;·&nbsp; MIT licensed
+
+</div>
