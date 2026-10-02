@@ -632,37 +632,15 @@ header{display:flex;align-items:center;justify-content:space-between;padding:11p
       <button class="tmpl-btn" id="settings-key-save" style="padding:9px 14px;border-radius:9px;">SAVE</button>
     </div>
 
-    <!-- Model Selector -->
+    <!-- Model Selector (auto-pulled from your Groq key) -->
     <div class="section-label">🤖 LLM Model</div>
-    <div class="model-group" id="model-group">
-      <label class="model-option selected" id="mo-llama33">
-        <input type="radio" name="model" value="llama-3.3-70b-versatile" checked>
-        <div class="model-info">
-          <div class="model-name">llama-3.3-70b-versatile <span class="model-tag tag-default">DEFAULT</span></div>
-          <div class="model-note">Best overall quality. Strong reasoning, nuanced responses. Recommended for Whisper & Session modes.</div>
-        </div>
-      </label>
-      <label class="model-option" id="mo-llama31">
-        <input type="radio" name="model" value="llama-3.1-8b-instant">
-        <div class="model-info">
-          <div class="model-name">llama-3.1-8b-instant <span class="model-tag tag-fast">FASTEST</span></div>
-          <div class="model-note">Ultra-low latency. Ideal for Whisper mode where speed matters most. Lighter responses.</div>
-        </div>
-      </label>
-      <label class="model-option" id="mo-llama32">
-        <input type="radio" name="model" value="llama3-70b-8192">
-        <div class="model-info">
-          <div class="model-name">llama3-70b-8192 <span class="model-tag tag-balanced">BALANCED</span></div>
-          <div class="model-note">High quality with longer context window (8192 tokens). Good for extended Session conversations.</div>
-        </div>
-      </label>
-      <label class="model-option" id="mo-mixtral">
-        <input type="radio" name="model" value="mixtral-8x7b-32768">
-        <div class="model-info">
-          <div class="model-name">mixtral-8x7b-32768 <span class="model-tag tag-smart">LARGE CTX</span></div>
-          <div class="model-note">Massive 32k context window. Best for long session history and complex Sales Coach scenarios.</div>
-        </div>
-      </label>
+    <div id="groq-model-block">
+      <div class="model-note" style="margin-bottom:8px;">Pulled live from your Groq account — the newest chat models your key can use. Used for Whisper coaching, Session replies, summaries and auto-fill. Speech-to-text is set below.</div>
+      <div class="voice-row">
+        <select class="voice-select" id="groq-model-select"></select>
+        <button class="voice-test-btn" id="btn-refresh-groq-models">↻ Refresh</button>
+      </div>
+      <div class="model-note" id="groq-model-status" style="margin-top:6px;font-family:'Share Tech Mono',monospace;"></div>
     </div>
 
     <!-- STT Model -->
@@ -769,7 +747,6 @@ let analyser=null, analyserBuf=null, animFrame=null;
 let connected=false, connecting=false, sessionText='', activeScreen='whisper';
 let editingTmplId=null, scrapeContext=null;
 let playbackSpeed=0.9;
-let selectedModel='llama-3.3-70b-versatile';
 let selectedSTT='whisper-large-v3';
 let vadSilenceMs=900;
 let selectedVoice=null;
@@ -793,11 +770,148 @@ const vuRow=G('vu-row');
 for(let i=0;i<VU;i++){const s=document.createElement('div');s.className='vu-seg';s.id='v'+i;vuRow.appendChild(s);}
 const canvas=G('sb-canvas'), ctx=canvas.getContext('2d');
 
+// ── GROQ MODEL LIST (auto-pulled from the user's key) ─────────────────────────
+// Nothing is hardcoded except a last-resort fallback. On Save Key / Refresh
+// (and silently when the cached list is >3 days old) we ask Groq which models
+// this key can use, drop non-chat models (speech, TTS, guard/safety, embeddings,
+// compound agents), keep the newest few, and let the user pick. If Groq rejects
+// the selected model as retired, groqChat() re-pulls the list and retries once.
+// NOTE: the live streaming call (groqLLMStream) only reads getGroqModel().
+const GROQ_MODEL_FALLBACK='llama-3.3-70b-versatile';
+const GROQ_MODELS_CACHE_KEY='lp_groq_models';
+const GROQ_MODEL_SELECTED_KEY='lp_model';   // same key the old radio list used
+const GROQ_MODEL_LIST_SIZE=5;
+const GROQ_MODEL_STALE_MS=3*24*60*60*1000;
+const GROQ_NON_CHAT=/whisper|tts|playai|orpheus|guard|safeguard|embed|compound|moderation|transcri/i;
+// Reasoning models stay selectable, but are never the auto-default: this app streams short
+// (max_tokens 300) real-time replies straight to the transcript + TTS, where hidden
+// reasoning tokens add latency and can use up the token budget.
+const GROQ_REASONING=/gpt-oss|qwen3|qwq|deepseek-r1|-r1\b|reason|think/i;
+
+function getGroqKey(){return apiKey||localStorage.getItem('lp_key')||'';}
+function getGroqModelCache(){try{return JSON.parse(localStorage.getItem(GROQ_MODELS_CACHE_KEY)||'null');}catch(e){return null;}}
+function getGroqModel(){return localStorage.getItem(GROQ_MODEL_SELECTED_KEY)||GROQ_MODEL_FALLBACK;}
+
+// Rough size from the id ("...-70b-...", "...-120b") so the default pick favours
+// capable models over tiny instant ones. Users can always override.
+function groqModelSize(id){const m=/(\d+(?:\.\d+)?)b(?![a-z])/i.exec(id);return m?parseFloat(m[1]):0;}
+
+function buildGroqModelList(raw){
+  const chat=(raw||[])
+    .filter(m=>m&&m.id&&m.active!==false&&!GROQ_NON_CHAT.test(m.id))
+    .sort((a,b)=>(b.created||0)-(a.created||0));
+  return chat.slice(0,GROQ_MODEL_LIST_SIZE).map(m=>({id:m.id,created:m.created||0}));
+}
+
+async function refreshGroqModels(opts){
+  const silent=opts&&opts.silent;
+  const key=getGroqKey();
+  const statusEl=document.getElementById('groq-model-status');
+  if(!key)return null;
+  if(!silent&&statusEl){statusEl.textContent='Fetching models…';statusEl.style.color='var(--dim)';}
+  try{
+    const res=await fetch('https://api.groq.com/openai/v1/models',{headers:{'Authorization':'Bearer '+key}});
+    if(!res.ok){
+      if(res.status===401)throw new Error('Groq rejected this API key.');
+      throw new Error('Could not load models (status '+res.status+').');
+    }
+    const body=await res.json();
+    const list=buildGroqModelList(body.data);
+    if(!list.length)throw new Error('No chat models came back for this key.');
+
+    // Keep the user's current choice if it is still available (even if it has
+    // slipped out of the newest few); otherwise pick the best default.
+    const current=localStorage.getItem(GROQ_MODEL_SELECTED_KEY);
+    const stillExists=current&&(body.data||[]).some(m=>m.id===current&&m.active!==false&&!GROQ_NON_CHAT.test(m.id));
+    if(stillExists&&!list.some(m=>m.id===current))list.push({id:current,created:0});
+    if(!stillExists){
+      const best=list.slice().sort((a,b)=>(GROQ_REASONING.test(a.id)-GROQ_REASONING.test(b.id))||groqModelSize(b.id)-groqModelSize(a.id)||b.created-a.created)[0];
+      localStorage.setItem(GROQ_MODEL_SELECTED_KEY,best.id);
+    }
+    localStorage.setItem(GROQ_MODELS_CACHE_KEY,JSON.stringify({fetchedAt:Date.now(),list}));
+    renderGroqModelPicker();
+    return list;
+  }catch(e){
+    if(!silent&&statusEl){
+      statusEl.textContent=(e instanceof TypeError)?'Couldn’t reach Groq — using the saved model.':e.message;
+      statusEl.style.color='var(--orange)';
+    }
+    return null;
+  }
+}
+
+function renderGroqModelPicker(){
+  const block=document.getElementById('groq-model-block');
+  const select=document.getElementById('groq-model-select');
+  const statusEl=document.getElementById('groq-model-status');
+  if(!block||!select)return;
+  if(!getGroqKey()){block.style.display='none';return;}
+  const cache=getGroqModelCache();
+  const selected=getGroqModel();
+  const ids=(cache&&cache.list?cache.list:[]).map(m=>m.id);
+  if(!ids.includes(selected))ids.unshift(selected);
+  select.innerHTML='';
+  ids.forEach(id=>{
+    const opt=document.createElement('option');
+    opt.value=id;opt.textContent=id;
+    if(id===selected)opt.selected=true;
+    select.appendChild(opt);
+  });
+  block.style.display='';
+  if(statusEl){
+    if(cache&&cache.fetchedAt){statusEl.textContent='Updated '+new Date(cache.fetchedAt).toLocaleDateString();statusEl.style.color='var(--green)';}
+    else{statusEl.textContent='Tap Refresh to load the latest models.';statusEl.style.color='var(--dim)';}
+  }
+}
+
+G('groq-model-select').addEventListener('change',e=>{
+  localStorage.setItem(GROQ_MODEL_SELECTED_KEY,e.target.value);
+  toast('→ '+e.target.value);
+});
+G('btn-refresh-groq-models').addEventListener('click',()=>refreshGroqModels());
+
+// Silent background refresh when the cached list is old (called from init(),
+// because the key isn't loaded yet when this block first runs).
+function groqModelsStaleCheck(){
+  const cache=getGroqModelCache();
+  if(getGroqKey()&&(!cache||Date.now()-cache.fetchedAt>GROQ_MODEL_STALE_MS))refreshGroqModels({silent:true});
+}
+
+// One shared non-streaming Groq chat call. Uses the selected model, merges any
+// extra body params (max_tokens, response_format…), strips <think> blocks that
+// reasoning models may emit, and self-heals once if the model has been retired.
+async function groqChat(key,messages,temperature,extra,_retried){
+  const model=getGroqModel();
+  const response=await fetch('https://api.groq.com/openai/v1/chat/completions',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},
+    body:JSON.stringify(Object.assign({model,messages,temperature},extra||{})),
+  });
+  if(!response.ok){
+    if(response.status===401)throw new Error('Groq rejected this API key — check it in Settings.');
+    if(response.status===429)throw new Error('Groq rate limit hit — wait a moment and try again.');
+    if(!_retried&&(response.status===400||response.status===404)){
+      let detail='';
+      try{const err=await response.clone().json();detail=JSON.stringify(err.error||err);}catch(e){}
+      if(/model/i.test(detail)){
+        localStorage.removeItem(GROQ_MODEL_SELECTED_KEY);   // drop the dead selection
+        await refreshGroqModels({silent:true});
+        if(getGroqModel()!==model)return groqChat(key,messages,temperature,extra,true);
+      }
+    }
+    throw new Error('Groq request failed (status '+response.status+'). Try again.');
+  }
+  const data=await response.json();
+  const msg=data.choices&&data.choices[0]&&data.choices[0].message;
+  if(msg&&typeof msg.content==='string')msg.content=msg.content.replace(/<think>[\s\S]*?<\/think>/gi,'').trim();
+  return data;
+}
+
 // ── INIT ──
 function init(){
   const k=localStorage.getItem('lp_key');
   if(k){apiKey=k;showMain();setTimeout(updatePills,100);}
-  const m=localStorage.getItem('lp_model');if(m)setModelSilent(m);
+  renderGroqModelPicker();groqModelsStaleCheck();
   const st=localStorage.getItem('lp_stt');if(st)setSTTSilent(st);
   const vs=localStorage.getItem('lp_vad_silence');if(vs){vadSilenceMs=parseInt(vs);G('vad-silence').value=vs;G('vad-silence-val').textContent=vs+'ms';}
 
@@ -812,17 +926,7 @@ function init(){
   G('settings-key-save').addEventListener('click',()=>{
     const v=G('settings-key-input').value.trim();
     if(!v){toast('⚠ Enter a key');return;}
-    apiKey=v;localStorage.setItem('lp_key',v);updatePills();toast('✓ Key updated');
-  });
-
-  // Model radios
-  document.querySelectorAll('input[name=model]').forEach(r=>{
-    r.addEventListener('change',()=>{
-      selectedModel=r.value;localStorage.setItem('lp_model',selectedModel);
-      document.querySelectorAll('.model-option').forEach(o=>o.classList.remove('selected'));
-      r.closest('.model-option').classList.add('selected');
-      toast('→ '+selectedModel);
-    });
+    const keyChanged=v!==apiKey;apiKey=v;localStorage.setItem('lp_key',v);if(keyChanged)localStorage.removeItem(GROQ_MODELS_CACHE_KEY);updatePills();toast('✓ Key updated');refreshGroqModels();
   });
 
   // STT radios
@@ -1025,13 +1129,6 @@ function init(){
   loadVoices();
 }
 
-function setModelSilent(m){
-  selectedModel=m;
-  document.querySelectorAll('input[name=model]').forEach(r=>{
-    if(r.value===m){r.checked=true;r.closest('.model-option').classList.add('selected');}
-    else r.closest('.model-option').classList.remove('selected');
-  });
-}
 function setSTTSilent(m){
   selectedSTT=m;
   document.querySelectorAll('input[name=stt-model]').forEach(r=>{
@@ -1042,6 +1139,7 @@ function setSTTSilent(m){
 
 function openSettings(){
   G('settings-key-input').value=apiKey;
+  renderGroqModelPicker();
   G('settings-panel').classList.add('on');
 }
 
@@ -1049,7 +1147,7 @@ function openSettings(){
 function saveKey(){
   const v=G('api-input').value.trim();
   if(!v){toast('⚠ Enter your Groq API key');return;}
-  apiKey=v;localStorage.setItem('lp_key',v);showMain();toast('✓ Key saved');updatePills();
+  const keyChanged=v!==apiKey;apiKey=v;localStorage.setItem('lp_key',v);if(keyChanged)localStorage.removeItem(GROQ_MODELS_CACHE_KEY);showMain();toast('✓ Key saved');updatePills();refreshGroqModels();
 }
 
 function showMain(){
@@ -1312,7 +1410,7 @@ async function groqLLMStream(history,systemPrompt){
     method:'POST',
     headers:{'Authorization':'Bearer '+apiKey,'Content-Type':'application/json'},
     body:JSON.stringify({
-      model:selectedModel,
+      model:getGroqModel(),
       messages:[{role:'system',content:systemPrompt},...history],
       max_tokens:300,
       temperature:0.7,
@@ -1549,12 +1647,7 @@ async function endSession(){
 Transcript:
 ${txt.slice(0,4000)}`;
   try{
-    const res=await fetch('https://api.groq.com/openai/v1/chat/completions',{
-      method:'POST',
-      headers:{'Authorization':'Bearer '+apiKey,'Content-Type':'application/json'},
-      body:JSON.stringify({model:selectedModel,messages:[{role:'user',content:prompt}],max_tokens:400,temperature:0.2})
-    });
-    const d=await res.json();
+    let d;try{d=await groqChat(apiKey,[{role:'user',content:prompt}],0.2,{max_tokens:400});}catch(e){d={};}
     const raw=(d.choices?.[0]?.message?.content||'');
     let summary=null;
     try{summary=JSON.parse(raw.replace(/```json|```/g,'').trim());}catch(e){const m=raw.match(/\{[\s\S]*\}/);if(m)try{summary=JSON.parse(m[0]);}catch(e2){}}
@@ -1568,7 +1661,7 @@ ${txt.slice(0,4000)}`;
 
 function saveSession(summary,txt){
   const sessions=JSON.parse(localStorage.getItem('lp_sessions')||'[]');
-  sessions.unshift({id:Date.now(),date:new Date().toLocaleString(),mode:appMode,persona:appMode==='session'?persona:whisperMode,summary,transcript:txt,note:'',locked:false,model:selectedModel});
+  sessions.unshift({id:Date.now(),date:new Date().toLocaleString(),mode:appMode,persona:appMode==='session'?persona:whisperMode,summary,transcript:txt,note:'',locked:false,model:getGroqModel()});
   if(sessions.length>50)sessions.pop();
   localStorage.setItem('lp_sessions',JSON.stringify(sessions));
 }
@@ -1605,6 +1698,7 @@ function updatePills(){
   if(kp){kp.className='pill '+(apiKey?'ok':'err');kp.title=apiKey?'API Key: Active':'API Key: Missing';}
   if(mp){const on=connected;mp.className='pill '+(on?'ok':'warn');mp.title=on?'Mic: Active':'Mic: Inactive';}
   if(cp){cp.className='pill '+(connected?'ok':connecting?'warn':'');cp.title=connected?'Connected':'Disconnected';}
+  if(typeof renderGroqModelPicker==='function')renderGroqModelPicker();
 }
 
 // ── TOAST ──
@@ -1682,8 +1776,7 @@ async function scrapeCompanyURL(){
     const text=html.replace(/<style[^>]*>[\s\S]*?<\/style>/gi,'').replace(/<script[^>]*>[\s\S]*?<\/script>/gi,'').replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').slice(0,4000);
     status.textContent='// Page fetched — asking Groq to extract details...';
     const prompt=`You are analyzing a company website. Extract key information and respond ONLY with a raw JSON object — no markdown, no backticks.\n\n{"company_name":"name of the company","product_description":"1-2 sentence description of what they sell","value_props":"3-5 bullet points of key selling points, each on a new line starting with •","common_objections":"3 realistic sales objections a prospect might raise, each on a new line starting with •","prospect_description":"describe the ideal buyer/prospect for this product in one sentence"}\n\nWebsite text:\n${text}`;
-    const apiRes=await fetch('https://api.groq.com/openai/v1/chat/completions',{method:'POST',headers:{'Authorization':'Bearer '+apiKey,'Content-Type':'application/json'},body:JSON.stringify({model:selectedModel,messages:[{role:'user',content:prompt}],max_tokens:600,temperature:0.2})});
-    const apiData=await apiRes.json();const raw=(apiData.choices?.[0]?.message?.content||'');
+    const apiData=await groqChat(apiKey,[{role:'user',content:prompt}],0.2,{max_tokens:600});const raw=(apiData.choices?.[0]?.message?.content||'');
     let parsed=null;try{parsed=JSON.parse(raw.replace(/```json|```/g,'').trim());}catch(e){const m=raw.match(/\{[\s\S]*\}/);if(m)try{parsed=JSON.parse(m[0]);}catch(e2){}}
     if(!parsed){status.textContent='// ✗ Could not parse — fill fields manually';btn.textContent='🔍 Auto-fill';btn.disabled=false;return;}
     if(!G('tmpl-name').value&&parsed.company_name)G('tmpl-name').value=parsed.company_name+' Pitch';
@@ -1699,8 +1792,8 @@ async function scrapeCompanyURL(){
 }
 
 // ── IMPORT / EXPORT ──
-function doExport(){const data={version:APP_VERSION,exported:new Date().toISOString()};if(G('exp-sessions').checked)data.sessions=JSON.parse(localStorage.getItem('lp_sessions')||'[]');if(G('exp-templates').checked)data.templates=JSON.parse(localStorage.getItem('lp_templates')||'[]');if(G('exp-settings').checked)data.settings={apiKey,model:selectedModel,stt:selectedSTT,vadSilenceMs};const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`listener-pro-export-${new Date().toISOString().slice(0,10)}.json`;a.click();toast('📤 Exported successfully');}
-function doImport(e){const file=e.target.files[0];if(!file)return;const reader=new FileReader();reader.onload=ev=>{try{const data=JSON.parse(ev.target.result);if(G('imp-sessions').checked&&data.sessions){const existing=JSON.parse(localStorage.getItem('lp_sessions')||'[]');const merged=[...data.sessions,...existing.filter(s=>!data.sessions.find(ns=>ns.id===s.id))];localStorage.setItem('lp_sessions',JSON.stringify(merged));}if(G('imp-templates').checked&&data.templates){const existing=JSON.parse(localStorage.getItem('lp_templates')||'[]');const merged=[...data.templates,...existing.filter(t=>!data.templates.find(nt=>nt.id===t.id))];localStorage.setItem('lp_templates',JSON.stringify(merged));loadTemplateSelect();}if(G('imp-settings').checked&&data.settings){if(data.settings.apiKey){apiKey=data.settings.apiKey;localStorage.setItem('lp_key',apiKey);updatePills();}if(data.settings.model)setModelSilent(data.settings.model);}toast('✓ Import complete');}catch(err){toast('⚠ Import failed — invalid file');}};reader.readAsText(file);e.target.value='';}
+function doExport(){const data={version:APP_VERSION,exported:new Date().toISOString()};if(G('exp-sessions').checked)data.sessions=JSON.parse(localStorage.getItem('lp_sessions')||'[]');if(G('exp-templates').checked)data.templates=JSON.parse(localStorage.getItem('lp_templates')||'[]');if(G('exp-settings').checked)data.settings={apiKey,model:getGroqModel(),stt:selectedSTT,vadSilenceMs};const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`listener-pro-export-${new Date().toISOString().slice(0,10)}.json`;a.click();toast('📤 Exported successfully');}
+function doImport(e){const file=e.target.files[0];if(!file)return;const reader=new FileReader();reader.onload=ev=>{try{const data=JSON.parse(ev.target.result);if(G('imp-sessions').checked&&data.sessions){const existing=JSON.parse(localStorage.getItem('lp_sessions')||'[]');const merged=[...data.sessions,...existing.filter(s=>!data.sessions.find(ns=>ns.id===s.id))];localStorage.setItem('lp_sessions',JSON.stringify(merged));}if(G('imp-templates').checked&&data.templates){const existing=JSON.parse(localStorage.getItem('lp_templates')||'[]');const merged=[...data.templates,...existing.filter(t=>!data.templates.find(nt=>nt.id===t.id))];localStorage.setItem('lp_templates',JSON.stringify(merged));loadTemplateSelect();}if(G('imp-settings').checked&&data.settings){if(data.settings.apiKey){apiKey=data.settings.apiKey;localStorage.setItem('lp_key',apiKey);updatePills();}if(data.settings.model){localStorage.setItem(GROQ_MODEL_SELECTED_KEY,data.settings.model);}refreshGroqModels({silent:true});renderGroqModelPicker();}toast('✓ Import complete');}catch(err){toast('⚠ Import failed — invalid file');}};reader.readAsText(file);e.target.value='';}
 
 // ── SERVICE WORKER REGISTRATION ──────────────────────────────────────────────
 if ('serviceWorker' in navigator) {

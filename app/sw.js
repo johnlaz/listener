@@ -1,7 +1,7 @@
 // Listener Pro AI — Service Worker (PWABuilder Workbox base, validated)
 // Strategy: StaleWhileRevalidate for app shell, network-first for APIs
 
-const CACHE = "listener-pro-v5";
+const CACHE = "listener-pro-v6";
 const CACHE_PREFIX = "listener-pro-"; // only ever touch our own caches (origin is shared with other LAZLAB apps)
 
 importScripts('https://storage.googleapis.com/workbox-cdn/releases/5.1.2/workbox-sw.js');

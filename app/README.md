@@ -1,143 +1,173 @@
-# Listener Pro AI — v3.0 Groq Edition
+<div align="center">
 
-> Real-time AI conversational support. Speak. AI listens. AI responds. Repeat.
+<img src="./icon-192x192.png" alt="Listener Pro AI" width="96" height="96">
 
-![Listener Pro](./apple-touch-icon.png)
+# Listener Pro AI &nbsp;·&nbsp; v3.0 Groq Edition
 
-## What It Does
+**Speak. AI listens. AI responds. Repeat.**
 
-**Listener Pro** is a progressive web app that gives you a real-time AI co-pilot for conversations — whether you're in a tough talk, a sales call, a coaching session, or just want to think out loud.
+[Launch](https://johnlaz.github.io/listener/app/) &nbsp;·&nbsp; [Site](https://johnlaz.github.io/listener/) &nbsp;·&nbsp; [Android APK](./lpai.apk)
 
-### Two Modes
-
-**👂 Whisper Mode** — AI listens to a live conversation and whispers coaching cues back to you. Four sub-modes:
-- 💚 **Supportive** — Short validating phrases ("I hear you.", "That makes sense.")
-- 💛 **Engaged** — One curious follow-up question per turn
-- ❤️ **Logical** — Calm objective counter-point
-- 💙 **Baseline** — De-escalation and mediation phrases
-
-**🧠 Session Mode** — Direct AI conversation with four personas:
-- 🧠 **Therapist** — CBT-informed reflective listening
-- 💼 **Sales Coach** — Roleplay as a prospect or get coaching feedback
-- 🪞 **Devil's Advocate** — Stress-tests your thinking
-- 🧭 **Life Coach** — Goals, obstacles, action steps
+</div>
 
 ---
 
-## How It Works
+## What it is
+
+Listener Pro is a single-file progressive web app that turns your microphone into a real-time AI co-pilot. Bring your own free Groq key and you get live conversational coaching, persona sessions, and spoken replies — with no account, no backend, and nothing leaving your device except calls to Groq.
+
+> 👂 **Whisper Mode** coaches you *during* a live conversation.
+> 🧠 **Session Mode** lets you talk *with* an AI persona.
+
+![Listener Pro mobile](./screenshot-narrow.png)
+
+---
+
+## The pipeline
 
 ```
 Mic → VAD → Groq Whisper STT → Groq LLM (streaming) → Web Speech TTS
 ```
 
-- **VAD** (Voice Activity Detection) — detects when you stop speaking and auto-sends
-- **Groq Whisper** — transcribes your speech, typically in ~200–400ms
-- **Groq LLM** — streams a response using your chosen model
-- **Web Speech API** — speaks the response back; VAD is gated while AI speaks so it can't hear itself
-- **⚡ Manual override** — force a reply at any time
+| Stage | What happens |
+|---|---|
+| **VAD** | Detects when you stop speaking and sends automatically. Silence threshold is adjustable from 400 ms to 2000 ms. |
+| **Groq Whisper** | Transcribes your speech — typically in ~200–400 ms. |
+| **Groq LLM** | Streams the reply token by token, using the model you choose. |
+| **Web Speech TTS** | Speaks it back. VAD is fully gated while the AI talks, so it can never hear itself. |
+| **⚡ Manual override** | Force a reply any time. |
 
 ---
 
-## Setup
+## Modes & personas
 
-### 1. Get a Groq API Key
-
-Free at [console.groq.com](https://console.groq.com). Your key starts with `gsk_`.
-
-### 2. Deploy
-
-**Option A — GitHub Pages (recommended)**
-1. Fork or clone this repo
-2. Go to repo **Settings → Pages → Source → Deploy from branch → main / root**
-3. Visit `https://yourusername.github.io/listener-pro`
-4. Enter your Groq key on first launch — stored locally, never sent anywhere except Groq
-
-**Option B — Local**
-```bash
-# Serve with any static server (required for mic permissions over HTTPS or localhost)
-npx serve .
-# or
-python3 -m http.server 8080
-```
-Then open `http://localhost:8080`
-
-> ⚠️ Microphone access requires HTTPS in production. GitHub Pages provides this automatically.
-
-### 3. Install as PWA
-
-On mobile: tap **Share → Add to Home Screen** (iOS) or the install banner (Android/Chrome).  
-On desktop: click the install icon in the address bar.
-
----
-
-## Models
-
-### LLM (configurable in Settings)
-
-| Model | Tag | Notes |
+### 👂 Whisper Mode
+| | Style | Output |
 |---|---|---|
-| `llama-3.3-70b-versatile` | DEFAULT | Best quality, recommended |
-| `llama-3.1-8b-instant` | FASTEST | Ultra-low latency, lighter |
-| `llama3-70b-8192` | BALANCED | Long context (8k tokens) |
-| `mixtral-8x7b-32768` | LARGE CTX | 32k context for long sessions |
+| 💚 | Supportive | Short validating phrases |
+| 💛 | Engaged | One curious follow-up question per turn |
+| ❤️ | Logical | Calm, objective counter-point |
+| 💙 | Baseline | De-escalation and mediation phrases |
 
-### STT (configurable in Settings)
+### 🧠 Session Mode
+| | Persona | Focus |
+|---|---|---|
+| 🧠 | Therapist | CBT-informed reflective listening |
+| 💼 | Sales Coach | Prospect roleplay or pitch coaching |
+| 🪞 | Devil's Advocate | Stress-tests your thinking |
+| 🧭 | Life Coach | Goals, obstacles, action steps |
+
+---
+
+## Models — always current
+
+### 🤖 LLM: pulled live from your key
+
+There is no hardcoded model list to go stale. When you save your key (or tap **↻ Refresh** in Settings → LLM Model), the app asks Groq which models your account can use, then:
+
+- keeps **chat models only** — speech, TTS, guard/safety, embedding, and compound-agent models are filtered out
+- shows the **newest five** in a dropdown, plus your current pick if it has slipped off the list
+- chooses a sensible **default** (the largest non-reasoning model) the first time
+- **refreshes silently** in the background when the list is more than 3 days old
+- **self-heals**: if Groq reports the selected model as retired, the app re-pulls the list and retries once on a replacement
+
+Reasoning models (e.g. `gpt-oss`, `qwen3`) are always selectable but never auto-picked — Listener Pro streams short real-time replies, where hidden reasoning tokens add latency.
+
+If Groq can't be reached, the app keeps using your last saved model, falling back to `llama-3.3-70b-versatile` on a fresh install.
+
+### 🎙 STT: set in Settings
 
 | Model | Notes |
 |---|---|
-| `whisper-large-v3` | Highest accuracy, recommended |
-| `whisper-large-v3-turbo` | ~2x faster, minimal accuracy trade-off |
+| `whisper-large-v3` | Highest accuracy — recommended |
+| `whisper-large-v3-turbo` | ~2× faster, minimal accuracy trade-off |
 
 ---
 
 ## Features
 
-- 🎯 **VAD with silence threshold** — configurable 400ms–2000ms (Settings)
-- 🔊 **TTS voice selector** — any browser voice, with test button
-- 💬 **Streaming responses** — words appear as they generate
-- 📊 **Pipeline timing** — see STT and LLM latency live
-- 📋 **Session history** — auto-saves with AI-generated summaries
-- 🔒 **Lock sessions** — protect important sessions from deletion
-- 📝 **Session notes** — attach personal notes to any session
-- 📤 **Export** — full transcripts and summaries as .txt
-- 💼 **Sales templates** — save prospect profiles with auto-fill from company URL
-- 👁 **Ghost Mode** — blank screen with tap-to-change-mode corners (stealth use)
-- 📦 **Import/Export** — backup and restore all data as JSON
-- 🔌 **Offline-capable** — app shell cached by service worker
+- 🎯 **Adjustable VAD** — 400 ms to 2000 ms silence threshold
+- 🔊 **Voice selector** — any browser voice, with a test button
+- 💬 **Streaming replies** — words appear as they're generated
+- 📊 **Live pipeline timing** — watch STT and LLM latency
+- 📋 **Session history** — auto-saved with AI-generated summaries
+- 🔒 **Lock sessions** — protect the important ones from deletion
+- 📝 **Session notes** — attach your own notes to any session
+- 📤 **Export** — transcripts and summaries as `.txt`
+- 💼 **Sales templates** — save prospect profiles, auto-fill from a company URL
+- 👁 **Ghost Mode** — blank screen with tap-to-change-mode corners
+- 📦 **Import / Export** — back up and restore everything as JSON
+- 🔌 **Offline-capable** — app shell cached by a service worker
 
 ---
 
-## File Structure
+## Setup
+
+### 1 · Get a Groq key
+Free at [console.groq.com](https://console.groq.com). Keys start with `gsk_`.
+
+### 2 · Run it
+
+**Hosted (easiest)** — open [johnlaz.github.io/listener/app](https://johnlaz.github.io/listener/app/), paste your key, go.
+
+**Self-host on GitHub Pages**
+1. Fork or clone the repo
+2. **Settings → Pages → Deploy from branch → `main` / root**
+3. Open `https://<you>.github.io/<repo>/app/`
+
+**Run locally**
+```bash
+# from the repo root
+npx serve .
+# or
+python3 -m http.server 8080
+```
+Then open `http://localhost:8080/app/`.
+
+> ⚠️ Microphone access needs HTTPS (or `localhost`). GitHub Pages provides HTTPS automatically.
+
+### 3 · Install it
+- **iOS** — Share → Add to Home Screen
+- **Android / Chrome** — the install banner, or the [APK](./lpai.apk)
+- **Desktop** — the install icon in the address bar
+
+---
+
+## Repo structure
 
 ```
-listener-pro/
-├── index.html              # Full app (single file)
-├── manifest.json           # PWA manifest
-├── sw.js                   # Service worker
-├── favicon.ico
-├── apple-touch-icon.png    # iOS home screen icon (180x180)
-├── icon-72x72.png
-├── icon-96x96.png
-├── icon-128x128.png
-├── icon-144x144.png
-├── icon-152x152.png
-├── icon-192x192.png
-├── icon-384x384.png
-├── icon-512x512.png
-└── icon-512x512-maskable.png
+/
+├── index.html                 # Landing page
+├── README.md
+└── app/
+    ├── index.html             # The whole app (single file)
+    ├── manifest.json          # PWA manifest (scope: /listener/app/)
+    ├── sw.js                  # Service worker
+    ├── lpai.apk               # Android build
+    ├── favicon.ico · favicon-16x16.png · favicon-32x32.png
+    ├── apple-touch-icon.png   # iOS home-screen icon (180×180)
+    ├── icon-72 … icon-512.png # Standard PWA icons
+    ├── icon-512x512-maskable.png
+    └── screenshot-wide.png · screenshot-narrow.png
 ```
 
 ---
 
-## Privacy
+## 🔒 Privacy
 
-- Your Groq API key is stored in `localStorage` — never transmitted anywhere except directly to `api.groq.com`
-- Audio is processed locally by your browser's microphone APIs
+- Your Groq key is stored in `localStorage` and sent **only** to `api.groq.com`
+- Audio is captured by your browser's microphone APIs and sent only to Groq for transcription
+- Session history lives in `localStorage` on your device
 - No analytics, no tracking, no backend
-- All session history is stored in `localStorage` on your device
 
 ---
 
 ## License
 
-MIT — use freely, modify freely.
+MIT — use it freely, change it freely.
+
+<div align="center">
+
+**Made by [LAZLAB Creations](https://johnlaz.github.io/)**
+
+</div>
