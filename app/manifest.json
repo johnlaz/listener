@@ -1,18 +1,25 @@
 {
-  "id": "/",
+  "id": "/listener/app/",
   "name": "Listener Pro AI",
   "short_name": "Listener Pro",
   "description": "Real-time AI conversational support with Groq-powered transcription, persona coaching, and voice response.",
-  "start_url": "./index.html",
+  "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "display_override": [
+    "window-controls-overlay",
+    "standalone",
+    "minimal-ui"
+  ],
   "orientation": "portrait",
   "background_color": "#070c12",
   "theme_color": "#00aaff",
   "lang": "en",
   "dir": "ltr",
-  "categories": ["productivity", "utilities"],
+  "categories": [
+    "productivity",
+    "utilities"
+  ],
   "prefer_related_applications": false,
   "launch_handler": {
     "client_mode": "navigate-existing"
@@ -93,15 +100,25 @@
       "name": "Whisper Mode",
       "short_name": "Whisper",
       "description": "Jump into real-time transcription mode",
-      "url": "./index.html?mode=whisper",
-      "icons": [{ "src": "./icon-96x96.png", "sizes": "96x96" }]
+      "url": "./?mode=whisper",
+      "icons": [
+        {
+          "src": "./icon-96x96.png",
+          "sizes": "96x96"
+        }
+      ]
     },
     {
       "name": "Session Mode",
       "short_name": "Session",
       "description": "Start a persona coaching session",
-      "url": "./index.html?mode=session",
-      "icons": [{ "src": "./icon-96x96.png", "sizes": "96x96" }]
+      "url": "./?mode=session",
+      "icons": [
+        {
+          "src": "./icon-96x96.png",
+          "sizes": "96x96"
+        }
+      ]
     }
   ]
 }

@@ -1,7 +1,8 @@
 // Listener Pro AI — Service Worker (PWABuilder Workbox base, validated)
 // Strategy: StaleWhileRevalidate for app shell, network-first for APIs
 
-const CACHE = "listener-pro-v4";
+const CACHE = "listener-pro-v5";
+const CACHE_PREFIX = "listener-pro-"; // only ever touch our own caches (origin is shared with other LAZLAB apps)
 
 importScripts('https://storage.googleapis.com/workbox-cdn/releases/5.1.2/workbox-sw.js');
 
@@ -29,7 +30,7 @@ self.addEventListener('install', async (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
+      Promise.all(keys.filter(k => k.startsWith(CACHE_PREFIX) && k !== CACHE).map(k => caches.delete(k)))
     ).then(() => self.clients.claim())
   );
 });
@@ -98,7 +99,7 @@ self.addEventListener('notificationclick', (event) => {
       for (const client of list) {
         if ('focus' in client) return client.focus();
       }
-      return clients.openWindow('./index.html');
+      return clients.openWindow('./');
     })
   );
 });
